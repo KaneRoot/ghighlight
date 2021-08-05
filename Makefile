@@ -26,6 +26,18 @@ run: ${TESTSRCS}
 man: ${TESTSRCS}
 	export GHLENABLECOLOR=1 && ./ghighlight.pl $< | groff -Tascii -w w -ms
 
+GH_INTRO = .nr DI 0;.DS I;.fam C
+GH_OUTRO = .fam;.DE
+export GH_INTRO
+export GH_OUTRO
+
+SHOPTS = --outlang-def=./groff.def
+export SHOPTS
+
+stuff:
+	#soelim test.ms | GH_INTRO="$(intro)" GH_OUTRO="$(outro)" SHOPTS="--outlang-def=./groff.def" ./ghighlight.pl | groff -Tpdf -w w -ms > MONPDF.pdf
+	soelim test.ms | ./ghighlight.pl | groff -Tpdf -w w -ms > MONPDF.pdf
+
 %.pdf: %.ms
 	soelim $< | ./ghighlight.pl | groff -Tpdf -w w -ms > $@
 
