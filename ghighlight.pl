@@ -47,6 +47,8 @@ use Cwd;
 # $Bin is the directory where this script is located
 use FindBin;
 
+# open3 for a bidirectional communication with a child process
+use IPC::Open3;
 
 ########################################################################
 # system variables and exported variables
@@ -101,27 +103,6 @@ foreach (@ARGV) {
   }
 }
 
-
-#######################################################################
-# temporary file
-#######################################################################
-
-my $out_file;
-{
-  my $template = 'ghighlight_' . "$$" . '_XXXX';
-  my $tmpdir;
-  foreach ($ENV{'GROFF_TMPDIR'}, $ENV{'TMPDIR'}, $ENV{'TMP'}, $ENV{'TEMP'},
-	   $ENV{'TEMPDIR'}, 'tmp', $ENV{'HOME'},
-	   File::Spec->catfile($ENV{'HOME'}, 'tmp')) {
-    if ($_ && -d $_ && -w $_) {
-      eval { $tmpdir = tempdir( $template,
-				CLEANUP => 1, DIR => "$_" ); };
-      last if $tmpdir;
-    }
-  }
-  $out_file = File::Spec->catfile($tmpdir, $template);
-}
-
 my $macros = "groff_mm";
 if ( $ENV{'GHLENABLECOLOR'} ) {
 	$macros = "groff_mm_color";
@@ -131,6 +112,8 @@ if ( $ENV{'GHLENABLECOLOR'} ) {
 ########################################################################
 
 my $source_mode = 0;
+
+my @lines = ();
 
 # language for codeblocks
 my $lang = '';
@@ -142,7 +125,7 @@ foreach (<>) {
 
   unless ( $is_dot_Source ) {	# not a '.SOURCE' line
     if ( $source_mode ) {		# is running in SOURCE mode
-      print OUT $line;
+      push @lines, $line;
     } else {			# normal line, not SOURCE-related
       print $line;
     }
@@ -176,7 +159,7 @@ foreach (<>) {
       next;
     } else {	# new SOURCE start
       $source_mode = 1;
-      open OUT, '>', $out_file;
+      @lines = ();
       next;
     }
   }
@@ -192,20 +175,28 @@ foreach (<>) {
   }
 
   $source_mode = 0;	# 'SOURCE' stop calling is correct
-  close OUT;		# close the storing of 'SOURCE' commands
 
   ##########
-  # Run source-highlight on file
-  my $sourcecode = '';
+  # Run source-highlight on lines
   # Check if language was specified
+  my $cmdline = "source-highlight -f $macros --output STDOUT";
   if ($lang ne '') {
-    $sourcecode = `source-highlight -s $lang -f $macros --output STDOUT -i $out_file`;
-  } else {
-    $sourcecode = `source-highlight -f $macros --output STDOUT -i $out_file`;
+    $cmdline .= " -s $lang";
   }
 
-  print $sourcecode;
-  my @print_res = (1);
+  my $pid = open3(my $child_in, my $child_out, my $child_err, $cmdline)
+    or die "open3() failed $!";
+
+  print $child_in $_ for @lines;
+  close $child_in;
+
+  while (<$child_out>) {
+    chomp;
+    print;
+  }
+  close $child_out;
+
+  # my @print_res = (1);
 
   # Start argument processing
 
