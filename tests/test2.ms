@@ -1,7 +1,7 @@
 .NH
 this is the start of test2
 
-.SOURCE start
+.SOURCE perl ps=5
 #! /usr/bin/env perl
 
 my this is sourced

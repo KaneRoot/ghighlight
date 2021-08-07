@@ -6,23 +6,6 @@
 .defcolor brown rgb #700000
 .defcolor purple rgb #700000
 .defcolor pink rgb #700000
-.LP
-this is a paragraph
-
-.SOURCE start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-.SOURCE stop
-
-.LP
-just make sure this prints
-
-.SOURCE start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-.SOURCE
 
 .LP
 just make sure this prints
@@ -33,17 +16,7 @@ just make sure this prints
 my $version = 'This is a source code block';
 .SOURCE
 
-.LP
-just make sure this prints
-
-.`` start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-print $line;
-.`` stop
-
-.`` start
+.`` perl
 #! /usr/bin/env perl
 
 my $version = 'This is a source code block';
@@ -63,7 +36,7 @@ void fun1(){
     int i = 0;
     printf("hello\n");
 }
-    
+
 int main(int argc, char *argv[])
 {
     int t = 1;
@@ -89,7 +62,7 @@ void fun1(){
     int i = 0;
     printf("hello\n");
 }
-    
+
 int main(int argc, char *argv[])
 {
     int t = 1;
@@ -105,16 +78,6 @@ int main(int argc, char *argv[])
 .LP
 just make sure this prints
 
-.\" this is another code block in c
-.`` start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-.``
-print $line;
-.\" end source code block
-
-
 .`` perl
 #! /usr/bin/env perl
 
@@ -129,15 +92,3 @@ just make sure this prints
 
 my $version = 'This is a source code block';
 .`` stop
-
-.`` start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-.SOURCE stop
-
-.`` start
-#! /usr/bin/env perl
-
-my $version = 'This is a source code block';
-.SOURCE

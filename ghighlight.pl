@@ -29,23 +29,14 @@ use strict;
 use warnings;
 #use diagnostics;
 
-# temporary dir and files
-use File::Temp qw/ tempfile tempdir /;
-
-# needed for temporary dir
-use File::Spec;
-
-# for 'copy' and 'move'
-use File::Copy;
-
-# for fileparse, dirname and basename
-use File::Basename;
-
 # current working directory
 use Cwd;
 
 # $Bin is the directory where this script is located
 use FindBin;
+
+# open3 for a bidirectional communication with a child process
+use IPC::Open3;
 
 
 ########################################################################
@@ -101,27 +92,6 @@ foreach (@ARGV) {
   }
 }
 
-
-#######################################################################
-# temporary file
-#######################################################################
-
-my $out_file;
-{
-  my $template = 'ghighlight_' . "$$" . '_XXXX';
-  my $tmpdir;
-  foreach ($ENV{'GROFF_TMPDIR'}, $ENV{'TMPDIR'}, $ENV{'TMP'}, $ENV{'TEMP'},
-	   $ENV{'TEMPDIR'}, 'tmp', $ENV{'HOME'},
-	   File::Spec->catfile($ENV{'HOME'}, 'tmp')) {
-    if ($_ && -d $_ && -w $_) {
-      eval { $tmpdir = tempdir( $template,
-				CLEANUP => 1, DIR => "$_" ); };
-      last if $tmpdir;
-    }
-  }
-  $out_file = File::Spec->catfile($tmpdir, $template);
-}
-
 my $macros = "groff_mm";
 if ( $ENV{'GHLENABLECOLOR'} ) {
 	$macros = "groff_mm_color";
@@ -131,6 +101,8 @@ if ( $ENV{'GHLENABLECOLOR'} ) {
 ########################################################################
 
 my $source_mode = 0;
+
+my @lines = ();
 
 
 sub getTroffLine {
@@ -158,7 +130,7 @@ foreach (<>) {
 
   unless ( $is_dot_Source ) {	# not a '.SOURCE' line
     if ( $source_mode ) {		# is running in SOURCE mode
-      print OUT $line;
+      push @lines, $line;
     } else {			# normal line, not SOURCE-related
       print $line;
     }
@@ -193,7 +165,7 @@ foreach (<>) {
       next;
     } else {	# new SOURCE start
       $source_mode = 1;
-      open OUT, '>', $out_file;
+      @lines = ();
       next;
     }
   }
@@ -209,18 +181,24 @@ foreach (<>) {
   }
 
   $source_mode = 0;	# 'SOURCE' stop calling is correct
-  close OUT;		# close the storing of 'SOURCE' commands
 
   my $shopts = $ENV{"SHOPTS"} || "";
+
   ##########
-  # Run source-highlight on file
-  my $sourcecode = '';
+  # Run source-highlight on lines
   # Check if language was specified
+  my $cmdline = "source-highlight -f $macros $shopts --output STDOUT";
   if ($lang ne '') {
-    $sourcecode = `source-highlight -s $lang -f $macros $shopts --output STDOUT -i $out_file`;
-  } else {
-    $sourcecode = `source-highlight -f $macros $shopts --output STDOUT -i $out_file`;
+    $cmdline .= " -s $lang";
   }
+
+  # Start `source-highlight`
+  my $pid = open3(my $child_in, my $child_out, my $child_err, $cmdline)
+    or die "open3() failed $!";
+
+  # Provide source code to `source-highlight` in its standard input
+  print $child_in $_ for @lines;
+  close $child_in;
 
   if (my $v = $ENV{"GH_INTRO"}) {
     print for split /;/, $v;
@@ -231,7 +209,12 @@ foreach (<>) {
     print $l if ($l ne "");
   }
 
-  print $sourcecode;
+  # Print `source-highlight` output
+  while (<$child_out>) {
+    chomp;
+    print;
+  }
+  close $child_out;
 
   for (reverse @options) {
     my $l = getTroffLineOpposite $_;
@@ -241,6 +224,7 @@ foreach (<>) {
   if (my $v = $ENV{"GH_OUTRO"}) {
     print for split /;/, $v;
   }
+
   my @print_res = (1);
 
   # Start argument processing
